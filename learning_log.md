@@ -22,3 +22,14 @@ with <expression> as <name>:
 Calling a generator function does not really execute it but just constructs the object, it only rusn with next(gen_fun) is called upto yield. sum(), list() etc run to exhaustion regardless of number of yields. Thus be careful when having while True in a loop and calling sum() on it. 
 islice is iterator slice: islice(iterable, start, stop, step). It returns an iterator and not a list (lazy). Need to be wrapped in list if entire thing is needed. Used in streaming data to get a defined block eg list(islice(generator, 100))
 
+Day F:
+Dataset and fake loader
+A training-dataset's __getitem__(i) returns everything the loss needs to evaluate one example — input and the correct answer.
+for x, y in loader:
+A FakeLoader wraps a dataset, and when you iterate it, you get one batch at a time. Each batch is a chunk of batch_size examples, optionally in shuffled order.
+DataLoader init gets batch size and shuffle true or fales. iter function iterates over the batch size and builds the lists.
+Refer Dataset_learning.py
+
+Day G:
+Annotated MINST code. Importance of calling super(), dunders used. How Dataset and DataLoader interact etc. What context manager with no_grad does etc. 
+
