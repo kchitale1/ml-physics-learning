@@ -33,3 +33,9 @@ Refer Dataset_learning.py
 Day G:
 Annotated MINST code. Importance of calling super(), dunders used. How Dataset and DataLoader interact etc. What context manager with no_grad does etc. 
 
+Day 4:
+Back to physics AI learning. Building 1D diffusion problem. Defining Dataset class and using pytorch DataLoader. If num_workers>0 for windows, the code needs to be in if __name__=='__main__' guard as forking is not available. 
+Dataset has one job: given an index, return one sample. It knows nothing about batches, shuffling, or parallelism. Your DataLoader has one job: take a Dataset and turn it into a stream of batches. It knows nothing about what the data actually is.
+zip(*batch) transposes a list of (input, target) pairs into two tuples — one of all inputs, one of all targets. The * is the key: it converts the list into positional arguments so zip can do its column-grouping. ie you get one tensor for all inputs and one for all outputs after stacking. 
+Custom collate function can also pad for different sizes. 
+
