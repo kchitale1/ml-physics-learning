@@ -39,3 +39,7 @@ Dataset has one job: given an index, return one sample. It knows nothing about b
 zip(*batch) transposes a list of (input, target) pairs into two tuples — one of all inputs, one of all targets. The * is the key: it converts the list into positional arguments so zip can do its column-grouping. ie you get one tensor for all inputs and one for all outputs after stacking. 
 Custom collate function can also pad for different sizes. 
 
+Day 5:
+Losses. MSE, MAE and L2 loss. torch.norm is by default L2 norm. softmax+NLL in the same op gives numerical stability. state_dict is your data; your code is your architecture. Keep them separate.
+model.train() turns Dropout to True which randomly shuts off some of the neurons during train step. This is to regularize the model so it does not rely on a specific pathway all the time. During evaluation you want ALL NEURONS ON and model.eval() tells it to not do Dropout. 2nd is BatchNorm. For training mean and std deviation is derived from the whole batch so works fine but during evaluation we are doing sample by sample, so during eval it uses frozen in time long term mean from training. 
+state_dict is used to save snapshot of the model parameters. eg saving the best model from iterations. torch.save to save the snapshop and reload later. 

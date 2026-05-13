@@ -30,7 +30,6 @@ def my_collate(batch):
     print(f"Collating batch of {len(inputs)} samples")
     return torch.stack(inputs), torch.stack(targets)
 
-
 # after the class: instantiate, wrap in DataLoader, iterate one batch
 
 if __name__ == '__main__':
