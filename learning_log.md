@@ -43,3 +43,14 @@ Day 5:
 Losses. MSE, MAE and L2 loss. torch.norm is by default L2 norm. softmax+NLL in the same op gives numerical stability. state_dict is your data; your code is your architecture. Keep them separate.
 model.train() turns Dropout to True which randomly shuts off some of the neurons during train step. This is to regularize the model so it does not rely on a specific pathway all the time. During evaluation you want ALL NEURONS ON and model.eval() tells it to not do Dropout. 2nd is BatchNorm. For training mean and std deviation is derived from the whole batch so works fine but during evaluation we are doing sample by sample, so during eval it uses frozen in time long term mean from training. 
 state_dict is used to save snapshot of the model parameters. eg saving the best model from iterations. torch.save to save the snapshop and reload later. 
+
+Day 6:
+torch.device. Check what device is available then Use .to(device) to send model and data batch to a device (usually gpu) in training loop. For total loss use loss.item() instead of just loss to detach from the graph and get a pure python float. Otherwise on GPU with many batches the loss will accumulate. model.eval() turns off dropout and fixes BatchNorm, and torch.no_grad() stops gradient tracking
+On GPUs to get speedup use autocast to use dtype of torch.bfloat16. Half precision. Better than float16 due to wider exponent range so it has the same range as float32. Use bfloat16 only on the forward pass on matmul etc expensive ops. Backward and optimizer needs to run in full precision. For profiling use cuda events. eval doesn't need autocast as no gradients are tracked but stil needs .to(device) for batches.  
+
+Day 7:
+Coding full sin*exp analytical function NN with different number of layers and parameter count. Underfit obvious with tiny model but large (with #parameters>>inputs) still doesn't overfit because of early stopping and implicit regularization (dam's optimizer trajectory bias toward flat minima, the geometry of overparameterized loss landscapes, and the smoothness of MSE on a smooth target). Always look at GAP between train_loss and val_loss to determine overfitting. Since we used Gaussian noise, there is a noise floor that the model can't beat. 
+Overparameterized networks don't reliably overfit in practice — early stopping and implicit regularization bias the optimizer toward generalizing solutions, often violating classical "params >> data → memorize" intuition. To diagnose what's happening, look at three things together: the train-val gap (overfit signature), val loss anchored to the noise floor σ²_noise (capacity adequacy), and σ of residuals (independent capacity check). Val curve alone isn't enough.
+Width of MLP is #of neurons in a layer and depth is number of hidden layers. MLP's parameter count scales roughly as depth × width²
+Total expected error = Bias² + Variance + σ²_noise
+Always predict noise floor to see how well the model is doing. 

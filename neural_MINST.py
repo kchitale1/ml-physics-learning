@@ -4,9 +4,13 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
+import time
+
+#check what device we have available (GPU or CPU) and print it
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
 # --- Data loading ---
-
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.1307,), (0.3081,)),
@@ -34,7 +38,7 @@ test_loader  = DataLoader(test_set,  batch_size=256, shuffle=False)
 
 class MLP(nn.Module):                        # inheritance: MLP IS-A nn.Module
     def __init__(self, h1=128, h2=256):      # default argument values
-        #super().__init__()                   # super() finds nn.Module in the MRO;
+        super().__init__()                   # super() finds nn.Module in the MRO;
                                              # must be called so nn.Module can set up
                                              # its internal parameter registry
         self.fc1 = nn.Linear(784, h1)
@@ -54,7 +58,7 @@ class MLP(nn.Module):                        # inheritance: MLP IS-A nn.Module
         x = torch.relu(self.fc2(x))
         return self.fc3(x)                   # same __call__ indirection for fc2, fc3
 
-model     = MLP()                            # instantiation: calls MLP.__init__
+model     = MLP().to(device)                            # instantiation: calls MLP.__init__
 loss_fn   = nn.CrossEntropyLoss()           # also an nn.Module; callable via __call__
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 # model.parameters() is a generator method (uses yield internally).
@@ -62,15 +66,18 @@ optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
 # --- Training utilities ---
 
-def train_one_epoch(model, loader, loss_fn, optimizer):
+def train_one_epoch(model, loader, loss_fn, optimizer, device=device):
     model.train()                            # sets a flag on all submodules (affects
                                              # Dropout, BatchNorm, etc.); method call
     total_loss = 0.0
     for x, y in loader:                      # iterator protocol: loader.__iter__() once,
                                              # then loader.__next__() each iteration;
                                              # x, y = tuple unpacking of each batch
-        logits = model(x)                    # model.__call__(x) → model.forward(x)
-        loss   = loss_fn(logits, y)          # same __call__ pattern on CrossEntropyLoss
+        x = x.to(device)                      # move batch to device
+        y = y.to(device)
+        with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
+            logits = model(x)                    # model.__call__(x) → model.forward(x)
+            loss   = loss_fn(logits, y)          # same __call__ pattern on CrossEntropyLoss
         optimizer.zero_grad()               # clears .grad on every parameter tensor
         loss.backward()                      # autograd: traverses computational graph
                                              # in reverse (reverse-mode AD), populates .grad
@@ -82,7 +89,7 @@ def train_one_epoch(model, loader, loss_fn, optimizer):
     # len(loader.dataset) calls dataset.__len__() — the dunder you implemented in Day F's
     # FakeDataset is the exact same protocol PyTorch's MNIST relies on here.
 
-def evaluate(model, loader, loss_fn):
+def evaluate(model, loader, loss_fn, device=device):
     model.eval()                             # symmetric to model.train(); disables dropout etc.
     total_loss = 0.0
     correct    = 0
@@ -90,8 +97,12 @@ def evaluate(model, loader, loss_fn):
                                              # tracking, __exit__ re-enables it — same
                                              # protocol as `with open(...) as f`
         for x, y in loader:                  # iterator protocol again
+
+            x = x.to(device)                      # move batch to device
+            y = y.to(device)
             logits = model(x)
             loss   = loss_fn(logits, y)
+
             total_loss += loss.item() * x.size(0)
             correct += (logits.argmax(dim=1) == y).sum().item()
             # == on tensors calls Tensor.__eq__, returning a bool tensor (operator overloading)
@@ -106,12 +117,19 @@ n_epochs = 10
 train_losses, val_losses, val_accs = [], [], []  # tuple unpacking of list literals
 
 for epoch in range(n_epochs):               # range implements __iter__/__next__
-    train_loss          = train_one_epoch(model, train_loader, loss_fn, optimizer)
-    val_loss, val_acc   = evaluate(model, val_loader, loss_fn)   # tuple unpacking of return value
+    start = time.perf_counter()
+    train_loss          = train_one_epoch(model, train_loader, loss_fn, optimizer, device)
+    val_loss, val_acc   = evaluate(model, val_loader, loss_fn, device)   # tuple unpacking of return value
     train_losses.append(train_loss)         # list.append — plain method call
     val_losses.append(val_loss)
     val_accs.append(val_acc)
-    print(f"Epoch {epoch+1}/{n_epochs}: train={train_loss:.4f}  val={val_loss:.4f}  acc={val_acc:.4f}")
+
+    elapsed = time.perf_counter() - start
+
+    print(f"Epoch {epoch+1}/{n_epochs}: train={train_loss:.4f}  \
+          val={val_loss:.4f}  acc={val_acc:.4f} elapsed={elapsed:.2f}s")
+          
+    # print(f"Time for epoch {epoch+1}:  seconds
     # f-string: evaluated at runtime; :.4f is a format spec (same as str.format)
 
 test_loss, test_acc = evaluate(model, test_loader, loss_fn)   # tuple unpacking

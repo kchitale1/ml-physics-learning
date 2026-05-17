@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 from loss import make_diffusion_data
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 # --- Model ---
 class DiffusionMLP(nn.Module):
     def __init__(self, hidden=64):
@@ -20,7 +23,7 @@ X_train, y_train = make_diffusion_data(2000)
 X_val,   y_val   = make_diffusion_data(500)
 X_test,  y_test  = make_diffusion_data(500)
 
-model = DiffusionMLP()
+model = DiffusionMLP().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 loss_fn = nn.MSELoss()
 
@@ -33,6 +36,9 @@ best_val_loss = float('inf')
 patience_counter = 0
 train_history, val_history = [], []
 
+print("Model is on:", next(model.parameters()).device)
+print("Batch is on:", X_train.device)
+
 for epoch in range(max_epochs):
     # TRAIN STEP
     # TODO: set train mode, zero grads, forward, loss, backward, step
@@ -40,6 +46,7 @@ for epoch in range(max_epochs):
     model.train()
     optimizer.zero_grad()
     pred = model(X_train)
+
     train_loss = loss_fn(pred, y_train)
     train_loss.backward()
     optimizer.step()    
