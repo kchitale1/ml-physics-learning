@@ -54,3 +54,11 @@ Overparameterized networks don't reliably overfit in practice — early stopping
 Width of MLP is #of neurons in a layer and depth is number of hidden layers. MLP's parameter count scales roughly as depth × width²
 Total expected error = Bias² + Variance + σ²_noise
 Always predict noise floor to see how well the model is doing. 
+Noise floor matters to val_loss. There is no therotical floor for train_loss and model can find parameters to represent each sample point perfectly. 
+Regularize when overfit, scale up when underfit
+σ²(resid) = σ²(missed) + σ²(noise)
+
+Day 8:
+Weight initialization: so that weights don't explore or become zero as you go deeper into the network. Batchnorm re-centers and rescales the output distributions after each layer on forward pass. Var(y_i) = N · Var(w) · Var(x). Here N.Var(w) compounds over every pass. If we call this alpha the multiplication accumulates over each pass so if alpha > 1, variance increases every layer. If alpha < 1, variance goes to zero very fast. Optimally you want alpha near 1. This is what batchnorm is doing. This variance is important during backward pass resulting in exploding or vanishing gradients and weights barely moving. 
+Main takeaway:  without stable activations, you can't get a meaningful gradient signal to the early layers, and without that, deep networks don't learn any differently from shallow ones. The whole point of depth is that each layer can learn increasingly abstract features; that only happens if every layer actually receives a useful gradient.
+BN makes sure activations are normalized but it can't fix bad initialization. With good initialization BN has lower impact. BN shines more in DEEPER networks where variance compounding is a larger problem. ReLU zeros half of the neurons in forward pass so He account for that by introducing factor of 2. This is due to ReLU giving out 0 for negative ouputs so on average half neurons would be off (separate from dropout). Bsad init lands in a basin with a higher floor. ayerNorm when you have sequences or variable batch sizes. BatchNorm when you have fixed-length vectors and normal batch training
