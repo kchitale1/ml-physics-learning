@@ -61,4 +61,13 @@ Regularize when overfit, scale up when underfit
 Day 8:
 Weight initialization: so that weights don't explore or become zero as you go deeper into the network. Batchnorm re-centers and rescales the output distributions after each layer on forward pass. Var(y_i) = N · Var(w) · Var(x). Here N.Var(w) compounds over every pass. If we call this alpha the multiplication accumulates over each pass so if alpha > 1, variance increases every layer. If alpha < 1, variance goes to zero very fast. Optimally you want alpha near 1. This is what batchnorm is doing. This variance is important during backward pass resulting in exploding or vanishing gradients and weights barely moving. 
 Main takeaway:  without stable activations, you can't get a meaningful gradient signal to the early layers, and without that, deep networks don't learn any differently from shallow ones. The whole point of depth is that each layer can learn increasingly abstract features; that only happens if every layer actually receives a useful gradient.
-BN makes sure activations are normalized but it can't fix bad initialization. With good initialization BN has lower impact. BN shines more in DEEPER networks where variance compounding is a larger problem. ReLU zeros half of the neurons in forward pass so He account for that by introducing factor of 2. This is due to ReLU giving out 0 for negative ouputs so on average half neurons would be off (separate from dropout). Bsad init lands in a basin with a higher floor. ayerNorm when you have sequences or variable batch sizes. BatchNorm when you have fixed-length vectors and normal batch training
+BN makes sure activations are normalized but it can't fix bad initialization. With good initialization BN has lower impact. BN shines more in DEEPER networks where variance compounding is a larger problem. ReLU zeros half of the neurons in forward pass so He account for that by introducing factor of 2. This is due to ReLU giving out 0 for negative ouputs so on average half neurons would be off (separate from dropout). Bsad init lands in a basin with a higher floor. ayerNorm when you have sequences or variable batch sizes. BatchNorm when you have fixed-length vectors and normal batch training.
+With BN, problem will converge faster but with bad initilization will have a higher loss floor. No BN with good initialization will converge fine but takes longer. 
+
+Day 9: CNN
+Channels, pooling, convolution (filter), receptive field
+ conv layers learn what to look for (filters), and get deeper with more channels as you go. Pool layers shrink the spatial dimensions so later layers see larger regions of the original image without the cost of giant kernels.
+ Dropout to reduce overfitting but trains slower. Expected accuracy is around 70% with validation set with CIFAR-10 dataset. 
+ RF = RF_prev + (kernel_size − 1) × stride_product
+Stride of 1 is the standard choice
+
