@@ -71,3 +71,61 @@ Channels, pooling, convolution (filter), receptive field
  RF = RF_prev + (kernel_size − 1) × stride_product
 Stride of 1 is the standard choice
 
+
+Day 10: wandb
+Hyperparameters are important. One bad hyperparameter can ruin regardless of choice of others so select learning rate and batch size smartly. 
+Smaller batch means noisy gradient combined with a large step size results in optimizer overshooting,. gradient noise and step size interact multiplicatively. 
+Gradient graphs on wandb are useful to see vanishing
+
+Day 11: CFD problem
+Created a csv for velocity, pressure, vorticity dataset with openfoam and trained MLP to predict vorticity. Needed to include multiple timesteps to improve the fit of prediction vs actual vorticity. MLP struggles with extreme values eg vorticity near walls so Rsq log space is more important. Random splits of training and validation across all times are dangerous because adjacent time steps are correlated so model learns this and gets rewarded artificially increasing Rsq. Proper split would be temporal, ie train on early timesteps and validate on the latter eg. 
+Physically vorticity depends on gradients of velocity and not velocity itself so there is a ceiling in how much we can learn from single point training. A graph network or CNN can learn spatial features and would be able to break through the ceiling.
+Rsq of negative means worse prediction than just predicting the mean. 
+
+Day H: Gaussian Processes
+A GP is a distribution over functions. When you sample from a GP, you don't get a number — you get a whole function (a curve)
+Mean function: starting point estimate, usually0
+Covariance function (kernel): how similar are the function values at two input points x and x'?
+The most common kernel is the RBF (radial basis function), also called the squared exponential:
+k(x, x') = exp(−|x − x'|² / 2ℓ²)
+if x and x' are close together, k ≈ 1 (outputs should be similar). If they're far apart, k ≈ 0 (outputs can be anything). The length scale ℓ controls what "close" means
+If A and B have high positive covariance, knowing A is large tells you B is probably large too. They move together.
+If covariance is near zero, knowing A tells you nothing about B.
+Negative covariance means they move opposite
+So k(x, x') answers: "If I know the function value at x, how much does that constrain what the function can be at x'?"
+High k → knowing f(x) tells me a lot about f(x'). The function can't jump wildly between x and x'.
+Low k → f(x) and f(x') are nearly independent. The function could be anything at x' even if I know x.
+:::::::::::Gaussian Process — Mental Model:::::::::::
+
+Start with a mean function m(x), typically set to zero. This is your prior belief about the function before seeing any data — not a committed fit, just a neutral starting point.
+
+Choose a kernel k(x, x') that encodes your prior belief about the function's shape — specifically, how correlated nearby function values should be. The RBF kernel says the function is smooth: values at nearby inputs move together, values far apart are nearly independent. The length scale ℓ controls how quickly that correlation decays.
+Given training data at points X with outputs y, compute the covariance matrix K where each entry K[i,j] = k(xᵢ, xⱼ). This matrix captures the pairwise correlations between all your observations.
+
+To predict at a new point x*, condition the GP on the training data. This gives you an exact analytical expression for the posterior mean (your best guess at x*) and posterior variance (your uncertainty). No sampling required. The posterior mean is a weighted average of training outputs, where the weights reflect how similar x* is to each training point. The posterior variance is small near training data and large far from it.
+
+If observation noise σ² is included, the GP doesn't pass exactly through training points — it interpolates smoothly with residual uncertainty even at observed locations, reflecting measurement error. If noise is zero, the posterior variance at any training point collapses to exactly zero.
+
+Sampling from the GP (optional) draws complete plausible functions consistent with the data — useful for visualization and understanding uncertainty, but not needed for prediction itself.
+:::::::::::::::::::::::::::::::::::::::::::::::::::
+length_scale ℓ controls how quickly correlation decays with distance. Small ℓ means even nearby points are treated as nearly independent — the function can wiggle rapidly. Large ℓ means points far apart are still correlated — the function is forced to be slowly varying and smooth. It's essentially your prior belief about the spatial scale of variation in your function.
+noise_var σ² controls how much you trust your observations. High σ² means "my measurements have significant error, don't fit through them exactly." Low σ² means "my data is clean, fit close to every point." At σ²=0 you get exact interpolation.
+noise_car can be an array so that each observation has a specific variance from experiments.    
+The prior over functions is Gaussian. The observation noise is Gaussian. Gaussian prior × Gaussian likelihood = Gaussian posterior — and that product has a closed-form expression. No approximation needed. If you used a non-Gaussian kernel or non-Gaussian noise, the posterior would no longer be Gaussian and you'd need approximations like variational inference or MCMC. 
+Isotropic vs ARD kernel for multi dimensional inputs. ARD preferred as uses different lengths. 
+Normalize the input data with variance of 1 so that GP doesn't get confused and give one input more weight than the other.
+
+Day H: GPytorch
+Kernel, conditioning and conjugate. GPs are special because Gaussian is a special function. 
+Algorithm: (l is assumed 1 below)
+1. Calculate covariance matrix between the training data (K + σ_n²I)
+2. For new point calculate covariance vector with training points: K*
+3. Calculate prior variance K** (usually 1 since new point's covariance with itself is 0)
+4. Solve for α = (K + σ_n²I)⁻¹ y. This is using training data. This operation costs O(n^3) in compute
+5. The mean prediction at new point is μ∗​=K*^T​α and variance at new point is σ∗2​=K**​−K*^T(K + σ_n²I)⁻¹K*
+The GP prior exists before seeing any data. It represents your beliefs about what functions are plausible given only your assumptions about smoothness, scale, etc. (encoded by the kernel). The data comes in later when you compute the posterior.
+Small l means more wiggly functions, large l means smoother. 
+
+
+
+
