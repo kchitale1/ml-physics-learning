@@ -82,6 +82,7 @@ Created a csv for velocity, pressure, vorticity dataset with openfoam and traine
 Physically vorticity depends on gradients of velocity and not velocity itself so there is a ceiling in how much we can learn from single point training. A graph network or CNN can learn spatial features and would be able to break through the ceiling.
 Rsq of negative means worse prediction than just predicting the mean. 
 
+
 Day H: Gaussian Processes
 A GP is a distribution over functions. When you sample from a GP, you don't get a number — you get a whole function (a curve)
 Mean function: starting point estimate, usually0
@@ -115,9 +116,8 @@ The prior over functions is Gaussian. The observation noise is Gaussian. Gaussia
 Isotropic vs ARD kernel for multi dimensional inputs. ARD preferred as uses different lengths. 
 Normalize the input data with variance of 1 so that GP doesn't get confused and give one input more weight than the other.
 
-Day H: GPytorch
 Kernel, conditioning and conjugate. GPs are special because Gaussian is a special function. 
-Algorithm: (l is assumed 1 below)
+Algorithm: (l is assumed 1 below and with RBF)
 1. Calculate covariance matrix between the training data (K + σ_n²I)
 2. For new point calculate covariance vector with training points: K*
 3. Calculate prior variance K** (usually 1 since new point's covariance with itself is 0)
@@ -125,6 +125,45 @@ Algorithm: (l is assumed 1 below)
 5. The mean prediction at new point is μ∗​=K*^T​α and variance at new point is σ∗2​=K**​−K*^T(K + σ_n²I)⁻¹K*
 The GP prior exists before seeing any data. It represents your beliefs about what functions are plausible given only your assumptions about smoothness, scale, etc. (encoded by the kernel). The data comes in later when you compute the posterior.
 Small l means more wiggly functions, large l means smoother. 
+
+Day I: GPytorch
+To optimize l we would use maximizing marginal log-likelyhood (MLL) and optimize l. This naturally trades off fit vs. complexity — a very small ℓ fits the training data perfectly but pays a large complexity penalty. The optimizer finds the ℓ that balances both. This is Bayesian model selection built into the math.
+if you're fitting physical data and you know your instrument noise, you should pin σ_n rather than let it be learned
+
+Day J: MLP vs GP
+MLPs can never give uncertainty prediction and will confidently keep predicting. GPs naturally give an uncertainty estimate at each point. 
+NEed to be careful of some pitfalls in l initialization: The "large ℓ + large noise" minimum is particularly common because it's always available: any dataset can be explained as "flat function + noise". That's where optimizer with go with a large l initialization. 
+The wiggles outside the training range are a ghost of the nearby training data's structure, transmitted through the kernel's slow decay. This is actually a mild concern in practice — the GP looks confident about structure it's really just extrapolating from the kernel, not from data.
+
+Day 12: backward, autograd
+Spectral bias: networks learn low frequencies first. Standard MLPs fit the smooth, low-frequency structure of a target function early in training and only pick up sharp, high-frequency detail much later
+
+Day 16: Optimizers
+SGD: baseline, stochastic, may stop at local minima
+Momentum: Provides some velocity to get over the saddle point and ravine regions. Momentum accelerates travel along the shallow axis, it doesn't launch you out. Basically, momentum reduces oscillations and accelerates learning in the steepest gradient direction. Think anisotropic bowl, oscillations in the short dimensions are minimized as the velocity zeros out, long axis movement is faster. 
+Nesterov: momentum+, computing gradients at look-ahead position, faster, more stable
+Adam: adapting learning rates, momentum+2nd moment, works out of the box
+AdamW: Decouples weight decay, now default for most where regularization needed
+L-BFGS: 2nd order quasi Newton, Hessian, wants full batch gradients and smoothness so noisy on mini-batch, rarely used in deep learning. Used in PINNs as PDE-residual loss is smooth. L-BFGS on a noisy or non-smooth problem can diverge
+For PINNs 2 step: use Adam to get to a good basin (robustness and speed from a cold star) then switch to L-BFGS to go lower. Adam explores, L-BFGS refines. PINNS are full batch which makes L-BFGS ideal for them
+momentum gave the biggest single gain over plain SGD; AdamW ≈ Adam because this problem needs no real regularization; and the Adam→L-BFGS handoff bottomed out right at the noise floor, which is the PINN training pattern in miniature.
+weight decay is a regularizer, and a regularizer only helps when the model would otherwise overfit
+
+Day 17: Regularization
+Dropout: Random neuron shut off during training based on probability. Training smaller network everytime. Shines on big, overparameterized fully-connected layers with limited data. Ensembling reduces variance. Makes a more robust network. Can sometimes fight with BatchNorm. MC-dropput useful for science ML. 
+
+Weight decay: Should always be on. L2 penalty weights towards zero - biases towards snoother, lower frequency functions.With SGD, weight decay and L2 regularization are identical. 
+Exploding, vanishing gradients are solved by initialization scale (He/Xavier), normalization (BatchNorm/LayerNorm), residual connections, and gradient clipping. Weight decay lives on a totally different axis: it's a generalization tool, aimed at capacity, not at signal flow through depth.
+Each step weight is pulled in the direction where loss is minimized and weight decay pushes it to zero so it will grow ONLY if data demands it. (sets a higher bar). Weights settle in equilibrium of the two.
+Filters noise from data. (strong repeated evidence vs noisy data nudging weights)
+Function built from small weights is smooth, and noise can only be fit with sharpness. Big weights buy the network the freedom to wiggle violently between data points, and wiggling is memorization. Weight decay revokes that freedom. 
+weight decay biases the network toward smooth, low-curvature functions instead of jagged ones — which suppresses noise-fitting when the truth is smooth, but becomes a liability the moment the real physics is genuinely sharp, eg. sometimes in physics jaggeness is real like shock waves, and that's where PINNs struggle 
+Why smaller weights produce smoother fits? Because high amplitude functions needs sharper gradients which are only possible with large weights. Small weights cap the maximum slope, so network is physically incapable of steep turns. 
+
+Data augmentation: eg same data just transposed like mirror image or rotated. increase size of data. Need to be cautious that PDE is not changed with such a transform. 
+
+Label smoothing: Softens one-hot target like digit learning. 
+Regularizers are biased toward keeping signal — weight decay shrinks the ill-determined directions (smoothness/simplicity prior), augmentation constrains along known symmetries (invariance prior), label smoothing caps output confidence (max-entropy prior), dropout injects noise that forces redundancy (ensemble prior). In bias–variance terms every one of them trades a little bias for a large cut in variance.
 
 
 
